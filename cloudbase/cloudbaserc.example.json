@@ -1,0 +1,16 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "envId": "your-cloudbase-environment-id",
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    {
+      "name": "roadVinylUpdate",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 10,
+      "memorySize": 256,
+      "installDependency": true,
+      "description": "RoadVinyl version metadata and APK distribution"
+    }
+  ]
+}

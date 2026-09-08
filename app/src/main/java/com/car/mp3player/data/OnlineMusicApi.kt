@@ -199,7 +199,7 @@ class OnlineMusicApi(private val settings: SettingsRepository) {
                 .orEmpty()
             songs.forEach { song ->
                 MediaPath.parseOnline(song.path)?.trackId?.let { trackId ->
-                    byId.putIfAbsent(trackId, song)
+                    byId.getOrPut(trackId) { song }
                 }
             }
         }

@@ -21,7 +21,7 @@
             android:contentDescription="@string/album_cover"
             android:src="@drawable/bg_vinyl_disc" />
 
-        <ImageView
+        <com.car.mp3player.ui.CircularCoverImageView
             android:id="@+id/vinylCover"
             android:layout_width="140dp"
             android:layout_height="140dp"

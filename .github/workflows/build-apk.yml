@@ -37,19 +37,19 @@ jobs:
           gradle-version: 8.2
 
       - name: Test, lint and build release APK
-        run: gradle testDebugUnitTest lintDebug assembleRelease --no-daemon
+        run: gradle -PyinyanMinSdk=24 testDebugUnitTest lintDebug assembleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RoadVinyl-4.1.0-unsigned
+          name: RoadVinyl-4.7.0-android7-unsigned
           path: app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Publish downloadable build
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.1.0-build
-          name: RoadVinyl 4.1.0 cloud build
+          tag_name: v4.7.0-build
+          name: RoadVinyl 4.7.0 cloud build
           prerelease: true
           body: |
             这是自动构建的未签名 APK，仅供后续使用原车机签名进行正式发布。

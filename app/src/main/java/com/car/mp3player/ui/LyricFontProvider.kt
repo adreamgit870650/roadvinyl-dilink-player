@@ -35,7 +35,7 @@ object LyricFontProvider {
             family.fontRes,
             object : ResourcesCompat.FontCallback() {
                 override fun onFontRetrieved(typeface: Typeface) {
-                    cache.keys.removeIf { it.startsWith("${family.id}_") }
+                    cache.keys.removeAll { it.startsWith("${family.id}_") }
                     cache["${family.id}_false"] = typeface
                     cache["${family.id}_true"] = Typeface.create(typeface, Typeface.BOLD)
                     onLoaded?.invoke()

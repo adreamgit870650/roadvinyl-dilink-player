@@ -2,7 +2,11 @@
 
 <resources>
 
-    <style name="Theme.MP3Player" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.MP3Player" parent="BaseTheme.MP3Player" />
+    <style name="Theme.MP3Player.Zelda" parent="BaseTheme.MP3Player.Zelda" />
+    <style name="Theme.MP3Player.Mario" parent="BaseTheme.MP3Player.Mario" />
+
+    <style name="BaseTheme.MP3Player" parent="Theme.MaterialComponents.DayNight.NoActionBar">
 
         <item name="colorPrimary">@color/netease_red</item>
 
@@ -12,17 +16,11 @@
 
         <item name="colorOnPrimary">@color/player_button_icon</item>
 
-        <item name="android:statusBarColor">@color/background</item>
-
-        <item name="android:navigationBarColor">@color/netease_bottom_nav</item>
-
         <item name="android:windowBackground">@color/background</item>
 
         <item name="android:textColorPrimary">@color/text_primary</item>
 
         <item name="android:textColorSecondary">@color/text_secondary</item>
-        <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
         <item name="materialButtonStyle">@style/CarPrimaryButton</item>
 
     </style>
@@ -38,7 +36,7 @@
 
 
 
-    <style name="Theme.MP3Player.Zelda" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="BaseTheme.MP3Player.Zelda" parent="Theme.MaterialComponents.NoActionBar">
 
         <item name="colorPrimary">@color/zelda_primary</item>
 
@@ -48,19 +46,11 @@
 
         <item name="colorOnPrimary">@color/zelda_background</item>
 
-        <item name="android:statusBarColor">@color/zelda_background</item>
-
-        <item name="android:navigationBarColor">@color/zelda_bottom_nav</item>
-
         <item name="android:windowBackground">@color/zelda_background</item>
 
         <item name="android:textColorPrimary">@color/zelda_text_primary</item>
 
         <item name="android:textColorSecondary">@color/zelda_text_secondary</item>
-
-        <item name="android:fontFamily">sans</item>
-
-        <item name="android:windowLightStatusBar">false</item>
 
         <item name="materialButtonStyle">@style/CarPrimaryButton</item>
 
@@ -68,7 +58,7 @@
 
 
 
-    <style name="Theme.MP3Player.Mario" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="BaseTheme.MP3Player.Mario" parent="Theme.MaterialComponents.NoActionBar">
 
         <item name="colorPrimary">@color/mario_primary</item>
 
@@ -78,19 +68,11 @@
 
         <item name="colorOnPrimary">@android:color/white</item>
 
-        <item name="android:statusBarColor">@color/mario_background</item>
-
-        <item name="android:navigationBarColor">@color/mario_bottom_nav</item>
-
         <item name="android:windowBackground">@color/mario_background</item>
 
         <item name="android:textColorPrimary">@color/mario_text_primary</item>
 
         <item name="android:textColorSecondary">@color/mario_text_secondary</item>
-
-        <item name="android:fontFamily">sans</item>
-
-        <item name="android:windowLightStatusBar">false</item>
 
         <item name="materialButtonStyle">@style/CarPrimaryButton</item>
 

@@ -28,12 +28,6 @@ enum class PlaylistViewMode {
     BY_ARTIST
 }
 
-enum class PlaylistSortOrder {
-    TITLE,
-    DURATION_ASC,
-    DURATION_DESC
-}
-
 enum class OnlineApiType {
     GD_STUDIO,
     NETEASE_ENHANCED

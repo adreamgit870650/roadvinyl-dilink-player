@@ -9,6 +9,7 @@
 .cxx
 app/build/
 songs/
+/.signing/
 release/
 *.apk
 *.aab

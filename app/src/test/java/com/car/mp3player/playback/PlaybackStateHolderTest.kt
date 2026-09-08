@@ -1,6 +1,7 @@
 package com.car.mp3player.playback
 
 import com.car.mp3player.model.LibraryKind
+import com.car.mp3player.model.PlaybackMode
 import com.car.mp3player.model.LrcChar
 import com.car.mp3player.model.LrcLine
 import com.car.mp3player.model.Song
@@ -15,6 +16,7 @@ class PlaybackStateHolderTest {
     @After
     fun resetState() {
         PlaybackStateHolder.clearPlaylist()
+        PlaybackStateHolder.setPlayMode(PlaybackMode.SHUFFLE)
     }
 
     @Test
@@ -35,5 +37,15 @@ class PlaybackStateHolderTest {
         assertEquals(0L, PlaybackStateHolder.durationMs)
         assertTrue(PlaybackStateHolder.lrcLines.isEmpty())
         assertNull(PlaybackStateHolder.coverArtPath)
+    }
+
+    @Test
+    fun `play mode can change safely with an empty playlist`() {
+        PlaybackStateHolder.clearPlaylist()
+
+        PlaybackStateHolder.setPlayMode(PlaybackMode.ORDER)
+
+        assertTrue(PlaybackStateHolder.songs.isEmpty())
+        assertEquals(PlaybackMode.ORDER, PlaybackStateHolder.playMode)
     }
 }

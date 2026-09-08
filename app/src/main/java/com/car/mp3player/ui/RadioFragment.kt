@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -162,7 +163,7 @@ class RadioFragment : Fragment(), PlaybackStateHolder.Listener {
             holder.itemView.setOnClickListener { playStation(station) }
             val playing = station.uuid == playingUuid
             holder.itemView.setBackgroundColor(
-                if (playing) requireContext().getColor(R.color.playing_highlight) else android.graphics.Color.TRANSPARENT
+                if (playing) ContextCompat.getColor(requireContext(), R.color.playing_highlight) else android.graphics.Color.TRANSPARENT
             )
         }
 

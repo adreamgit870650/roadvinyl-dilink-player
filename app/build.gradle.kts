@@ -10,16 +10,30 @@ val updateVersionUrl = providers.gradleProperty("ROADVINYL_UPDATE_VERSION_URL")
     .orElse(providers.environmentVariable("ROADVINYL_UPDATE_VERSION_URL"))
     .orElse("")
 
+// Build one source tree for modern and legacy vehicle systems. The regular
+// release keeps API 24, while local compatibility builds can opt into API 22
+// or API 19 with the documented Gradle properties.
+val requestedMinSdk = providers.gradleProperty("yinyanMinSdk").orNull?.toIntOrNull() ?: 22
+require(requestedMinSdk in setOf(19, 22, 24)) {
+    "yinyanMinSdk must be 19 (legacy car), 22 (Android 5.1), or 24 (Android 7.0)"
+}
+val requestedTargetSdk = providers.gradleProperty("yinyanTargetSdk").orNull?.toIntOrNull() ?: 34
+require(requestedTargetSdk in setOf(23, 34)) {
+    "yinyanTargetSdk must be 23 (legacy car) or 34 (regular release)"
+}
+require(requestedTargetSdk >= requestedMinSdk) { "yinyanTargetSdk must not be lower than yinyanMinSdk" }
+val requestedReleaseMinify = providers.gradleProperty("yinyanReleaseMinify").orNull?.toBooleanStrictOrNull() ?: false
+
 android {
     namespace = "com.car.mp3player"
     compileSdk = 34
 
     defaultConfig {
         applicationId = "com.car.mp3player"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 41
-        versionName = "4.1.0"
+        minSdk = requestedMinSdk
+        targetSdk = requestedTargetSdk
+        versionCode = 47
+        versionName = "4.7.0"
         buildConfigField(
             "String",
             "UPDATE_VERSION_URL",
@@ -27,9 +41,16 @@ android {
         )
     }
 
+    signingConfigs {
+        getByName("debug") {
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = requestedReleaseMinify
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

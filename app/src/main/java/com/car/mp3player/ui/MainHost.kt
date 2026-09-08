@@ -11,6 +11,8 @@ interface MainHost {
     fun clearMusicList()
     fun allSongs(): List<Song>
     fun notifyLyricStyleChanged()
+    fun notifyVinylScaleChanged()
+    fun notifyPlaylistTextSizeChanged()
     fun refreshAppTheme()
     fun syncPlayerBottomNav(backgroundColor: Int)
 }

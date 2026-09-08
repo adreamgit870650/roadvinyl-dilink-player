@@ -2,12 +2,11 @@ package com.car.mp3player.playback
 
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 
 /**
  * Routes steering-wheel / Bluetooth / voice media keys to custom playlist logic.
  */
-@androidx.annotation.OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class CarPlaylistPlayer(
     player: Player,
     private val onSkipNext: () -> Unit,

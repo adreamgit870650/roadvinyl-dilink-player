@@ -1,11 +1,13 @@
 package com.car.mp3player.data
 
 import android.content.Context
+import android.util.AtomicFile
 import com.car.mp3player.model.LibraryKind
 import com.car.mp3player.model.Song
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 
 object PlaylistCache {
     private const val CACHE_FILE = "playlist_cache.json"
@@ -15,13 +17,26 @@ object PlaylistCache {
     private const val RADIO_QUEUE_FILE = "play_queue_radio.json"
     private const val PODCAST_QUEUE_FILE = "play_queue_podcast.json"
 
-    fun save(context: Context, songs: List<Song>) = writeSongs(context, CACHE_FILE, songs)
+    fun save(context: Context, songs: List<Song>) {
+        if (songs.isEmpty()) {
+            runCatching { AtomicFile(File(context.filesDir, CACHE_FILE)).delete() }
+        } else {
+            writeSongs(context, CACHE_FILE, songs)
+        }
+    }
 
     fun load(context: Context): List<Song> = readSongs(context, CACHE_FILE)
 
     fun clearMusicLibrary(context: Context) {
         listOf(CACHE_FILE, MUSIC_QUEUE_FILE, QUEUE_FILE).forEach { fileName ->
-            runCatching { File(context.filesDir, fileName).delete() }
+            runCatching { AtomicFile(File(context.filesDir, fileName)).delete() }
+        }
+        MusicIndexStore(context).let { store ->
+            try {
+                store.clear()
+            } finally {
+                store.close()
+            }
         }
     }
 
@@ -58,16 +73,24 @@ object PlaylistCache {
                 }
             )
         }
-        runCatching {
-            File(context.filesDir, fileName).writeText(array.toString())
+        val target = AtomicFile(File(context.filesDir, fileName))
+        var output: FileOutputStream? = null
+        try {
+            output = target.startWrite()
+            output.write(array.toString().toByteArray(Charsets.UTF_8))
+            target.finishWrite(output)
+            output = null
+        } catch (_: Exception) {
+            output?.let(target::failWrite)
         }
     }
 
     private fun readSongs(context: Context, fileName: String): List<Song> {
         val file = File(context.filesDir, fileName)
-        if (!file.exists()) return emptyList()
+        if (!file.exists() && !File(file.absolutePath + ".bak").exists()) return emptyList()
         return runCatching {
-            val array = JSONArray(file.readText())
+            val text = AtomicFile(file).openRead().bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val array = JSONArray(text)
             buildList {
                 for (i in 0 until array.length()) {
                     val item = array.optJSONObject(i) ?: continue

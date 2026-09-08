@@ -1,9 +1,14 @@
 package com.car.mp3player.ui
 
+import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,13 +16,18 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.car.mp3player.ClusterLyricService
 import com.car.mp3player.LyricsOverlayService
 import com.car.mp3player.R
+import com.car.mp3player.compat.OverlayCompat
+import com.car.mp3player.compat.OverlayAccess
 import com.car.mp3player.data.ScanPathHelper
+import com.car.mp3player.data.SelectedDirectoryAccess
 import com.car.mp3player.data.SettingsRepository
 import com.car.mp3player.databinding.FragmentSettingsBinding
 import com.car.mp3player.model.AppThemePreset
@@ -31,6 +41,9 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.slider.Slider
 import com.google.android.material.switchmaterial.SwitchMaterial
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
@@ -43,22 +56,30 @@ class SettingsFragment : Fragment() {
     private var switchOverlayBold: SwitchMaterial? = null
     private var switchOverlayStroke: SwitchMaterial? = null
     private var overlayStrokeWidthSlider: Slider? = null
+    private var updatingOverlaySwitch = false
+    private var enableOverlayAfterGrant = false
+    private var openLegacyBrowserAfterPermission = false
+    private var directoryPathDialog: AlertDialog? = null
 
     private val overlayPermission = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        binding.switchOverlay.isChecked = settings.overlayEnabled && Settings.canDrawOverlays(requireContext())
+        handleOverlayPermissionResult()
     }
 
-    private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+    private val pickFolder = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
         if (uri == null) return@registerForActivityResult
-        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-        runCatching {
-            requireContext().contentResolver.takePersistableUriPermission(uri, flags)
+        saveSelectedTree(uri)
+    }
+
+    private val manualFolderPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (_binding == null) return@registerForActivityResult
+        if (granted) {
+            if (openLegacyBrowserAfterPermission) showLegacyDirectoryBrowser() else showDirectoryPathDialog()
         }
-        settings.addScanTreeUri(uri.toString())
-        refreshScanPathsUi()
-        Toast.makeText(requireContext(), R.string.folder_added, Toast.LENGTH_SHORT).show()
+        else Toast.makeText(requireContext(), R.string.folder_read_permission_needed, Toast.LENGTH_LONG).show()
+        openLegacyBrowserAfterPermission = false
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -69,12 +90,13 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         settings = SettingsRepository(requireContext())
+        enableOverlayAfterGrant = savedInstanceState?.getBoolean("enableOverlayAfterGrant") ?: false
         binding.switchAutoResume.isChecked = settings.autoResumePlayback
         binding.switchBootAutoStart.isChecked = settings.bootAutoStart
         setupBootExtraSwitches()
         setupStartupSoundSwitch()
         binding.switchClusterLyrics.isChecked = settings.clusterLyricsEnabled
-        binding.switchOverlay.isChecked = settings.overlayEnabled
+        syncOverlaySwitch()
         binding.switchOnlineLyrics.isChecked = settings.onlineLyricsEnabled
         binding.switchOnlineCover.isChecked = settings.onlineCoverEnabled
         binding.switchSmoothLyrics.isChecked = settings.smoothLyrics
@@ -88,6 +110,8 @@ class SettingsFragment : Fragment() {
         binding.currentLineScaleSlider.value = settings.currentLineScale
         binding.nextLineScaleSlider.value = settings.nextLineScale
         binding.maxLyricLinesSlider.value = settings.maxLyricVisualLines.toFloat()
+        binding.vinylScaleSlider.value = settings.vinylScale
+        binding.playlistTextSizeSlider.value = settings.playlistTextSizeSp
 
         when (settings.themeMode) {
             ThemeMode.LIGHT -> binding.themeLight.isChecked = true
@@ -107,7 +131,7 @@ class SettingsFragment : Fragment() {
         setupOnlineSettings()
         setupOverlayColorBars()
 
-        binding.btnPickFolder.setOnClickListener { pickFolder.launch(null) }
+        binding.btnPickFolder.setOnClickListener { chooseFolder() }
         binding.btnAddMusic.setOnClickListener { addPresetPath("内置 Music") }
         binding.btnAddDownload.setOnClickListener { addPresetPath("下载目录") }
 
@@ -141,6 +165,16 @@ class SettingsFragment : Fragment() {
         binding.switchOnlineCover.setOnCheckedChangeListener { _, checked ->
             settings.onlineCoverEnabled = checked
         }
+        binding.vinylScaleSlider.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            settings.vinylScale = value
+            (activity as? MainHost)?.notifyVinylScaleChanged()
+        }
+        binding.playlistTextSizeSlider.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            settings.playlistTextSizeSp = value
+            (activity as? MainHost)?.notifyPlaylistTextSizeChanged()
+        }
         binding.switchSmoothLyrics.setOnCheckedChangeListener { _, checked ->
             settings.smoothLyrics = checked
         }
@@ -163,11 +197,13 @@ class SettingsFragment : Fragment() {
         }
 
         binding.switchOverlay.setOnCheckedChangeListener { _, checked ->
-            if (checked && !Settings.canDrawOverlays(requireContext())) {
-                binding.switchOverlay.isChecked = false
-                requestOverlay()
+            if (updatingOverlaySwitch) return@setOnCheckedChangeListener
+            if (checked && !OverlayCompat.canDrawOverlays(requireContext())) {
+                syncOverlaySwitch()
+                requestOverlay(enableAfterGrant = true)
                 return@setOnCheckedChangeListener
             }
+            enableOverlayAfterGrant = false
             settings.overlayEnabled = checked
             if (checked) LyricsOverlayService.start(requireContext()) else LyricsOverlayService.stop(requireContext())
         }
@@ -517,13 +553,175 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun requestOverlay() {
-        overlayPermission.launch(
-            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${requireContext().packageName}"))
-        )
+    private fun chooseFolder() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            requestManualDirectoryPath(useLegacyBrowser = true)
+            return
+        }
+        // Launch directly: resolveActivity can incorrectly return null under
+        // package visibility restrictions on newer Android versions.
+        try {
+            pickFolder.launch(
+                Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                )
+            )
+        } catch (_: ActivityNotFoundException) {
+            requestManualDirectoryPath()
+        } catch (_: SecurityException) {
+            requestManualDirectoryPath()
+        }
+    }
+
+    private fun saveSelectedTree(uri: Uri) {
+        val appContext = context?.applicationContext ?: return
+        if (_binding == null) return
+        viewLifecycleOwner.lifecycleScope.launch {
+            val readable = withContext(Dispatchers.IO) {
+                SelectedDirectoryAccess.persistReadableTree(appContext, uri)
+            }
+            if (!readable) {
+                Toast.makeText(appContext, R.string.folder_persist_failed, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            settings.addScanTreeUri(uri.toString())
+            refreshScanPathsUi()
+            Toast.makeText(appContext, R.string.folder_added, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun requestManualDirectoryPath(useLegacyBrowser: Boolean = false) {
+        openLegacyBrowserAfterPermission = useLegacyBrowser
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (ContextCompat.checkSelfPermission(requireContext(), permission) == PackageManager.PERMISSION_GRANTED) {
+            if (useLegacyBrowser) showLegacyDirectoryBrowser() else showDirectoryPathDialog()
+            openLegacyBrowserAfterPermission = false
+        } else {
+            manualFolderPermission.launch(permission)
+        }
+    }
+
+    private fun showLegacyDirectoryBrowser() {
+        if (_binding == null) return
+        directoryPathDialog?.dismiss()
+        val dialog = LegacyDirectoryPickerDialog(requireContext()) { selectedPath ->
+            settings.addScanPath(selectedPath)
+            refreshScanPathsUi()
+            Toast.makeText(requireContext(), R.string.folder_added, Toast.LENGTH_SHORT).show()
+        }.create()
+        directoryPathDialog = dialog
+        dialog.show()
+    }
+
+    private fun showDirectoryPathDialog() {
+        if (_binding == null) return
+        val inputLayout = TextInputLayout(requireContext()).apply {
+            setPadding(24, 8, 24, 0)
+            hint = getString(R.string.folder_path_hint)
+        }
+        val input = TextInputEditText(requireContext()).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+        }
+        inputLayout.addView(input)
+        directoryPathDialog?.dismiss()
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(R.string.folder_picker_unavailable)
+            .setMessage(R.string.folder_path_explanation)
+            .setView(inputLayout)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        directoryPathDialog = dialog
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { button ->
+                val enteredPath = input.text?.toString().orEmpty()
+                button.isEnabled = false
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val path = withContext(Dispatchers.IO) { SelectedDirectoryAccess.readablePath(enteredPath) }
+                    button.isEnabled = true
+                    if (!dialog.isShowing) return@launch
+                    if (path == null) {
+                        inputLayout.error = getString(R.string.folder_path_invalid)
+                        return@launch
+                    }
+                    settings.addScanPath(path)
+                    refreshScanPathsUi()
+                    Toast.makeText(requireContext(), R.string.folder_added, Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun syncOverlaySwitch() {
+        val currentBinding = _binding ?: return
+        if (!::settings.isInitialized) return
+        updatingOverlaySwitch = true
+        try {
+            currentBinding.switchOverlay.isChecked = settings.overlayEnabled && OverlayCompat.canDrawOverlays(requireContext())
+        } finally {
+            updatingOverlaySwitch = false
+        }
+    }
+
+    private fun handleOverlayPermissionResult() {
+        if (_binding == null || !::settings.isInitialized) return
+        val access = OverlayCompat.access(requireContext())
+        if (access == OverlayAccess.ALLOWED && (enableOverlayAfterGrant || settings.overlayEnabled)) {
+            settings.overlayEnabled = true
+            LyricsOverlayService.start(requireContext())
+        } else if (access != OverlayAccess.ALLOWED) {
+            LyricsOverlayService.stop(requireContext())
+            Toast.makeText(requireContext(), if (access == OverlayAccess.UNKNOWN) {
+                R.string.overlay_permission_unknown
+            } else R.string.overlay_permission_denied, Toast.LENGTH_LONG).show()
+        }
+        enableOverlayAfterGrant = false
+        syncOverlaySwitch()
+    }
+
+    private fun requestOverlay(enableAfterGrant: Boolean = false) {
+        enableOverlayAfterGrant = enableAfterGrant
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            Toast.makeText(requireContext(), R.string.overlay_legacy_permission_help, Toast.LENGTH_LONG).show()
+        }
+        val candidates = listOf(
+            OverlayCompat.permissionIntent(requireContext()),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${requireContext().packageName}"))
+        ).distinctBy { it.action }
+        for (intent in candidates) {
+            try {
+                overlayPermission.launch(intent)
+                return
+            } catch (_: ActivityNotFoundException) {
+                // Try the general app settings page if the overlay page is absent.
+            } catch (_: SecurityException) {
+                // Some vendor ROMs do not export their permission settings page.
+            }
+        }
+        enableOverlayAfterGrant = false
+        Toast.makeText(requireContext(), R.string.overlay_settings_unavailable, Toast.LENGTH_LONG).show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        syncOverlaySwitch()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("enableOverlayAfterGrant", enableOverlayAfterGrant)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroyView() {
+        directoryPathDialog?.dismiss()
+        directoryPathDialog = null
         _binding = null
         super.onDestroyView()
     }

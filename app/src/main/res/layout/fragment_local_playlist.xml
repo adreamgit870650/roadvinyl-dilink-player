@@ -16,40 +16,17 @@
         android:layout_height="wrap_content"
         android:background="@android:color/transparent"
         android:minHeight="64dp"
-        android:paddingHorizontal="8dp"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
         app:title="@string/section_local"
         app:titleTextColor="@color/text_primary" />
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="2dp"
-        app:boxBackgroundColor="@color/surface"
-        app:boxCornerRadiusBottomEnd="20dp"
-        app:boxCornerRadiusBottomStart="20dp"
-        app:boxCornerRadiusTopEnd="20dp"
-        app:boxCornerRadiusTopStart="20dp"
-        app:boxStrokeColor="@color/netease_red"
-        app:hintEnabled="false"
-        app:startIconDrawable="@android:drawable/ic_menu_search">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/searchInput"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:hint="@string/search_hint"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_hint" />
-    </com.google.android.material.textfield.TextInputLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:layout_marginTop="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -76,46 +53,43 @@
             app:chipBackgroundColor="@color/chip_bg"
             app:chipStrokeColor="@color/netease_red"
             app:chipStrokeWidth="1dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            app:boxBackgroundColor="@color/surface"
+            app:boxCornerRadiusBottomEnd="20dp"
+            app:boxCornerRadiusBottomStart="20dp"
+            app:boxCornerRadiusTopEnd="20dp"
+            app:boxCornerRadiusTopStart="20dp"
+            app:boxStrokeColor="@android:color/transparent"
+            app:boxStrokeWidth="0dp"
+            app:boxStrokeWidthFocused="0dp"
+            app:hintEnabled="false"
+            app:startIconDrawable="@android:drawable/ic_menu_search">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchInput"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:gravity="center_vertical"
+                android:hint="@string/search_hint"
+                android:includeFontPadding="true"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:singleLine="true"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_hint" />
+        </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
-
-    <RadioGroup
-        android:id="@+id/sortGroup"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <RadioButton
-            android:id="@+id/sortTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:checked="true"
-            android:minHeight="48dp"
-            android:text="@string/sort_title"
-            android:textColor="@color/text_primary" />
-
-        <RadioButton
-            android:id="@+id/sortDurationAsc"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="@string/sort_duration_asc"
-            android:textColor="@color/text_primary" />
-
-        <RadioButton
-            android:id="@+id/sortDurationDesc"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="@string/sort_duration_desc"
-            android:textColor="@color/text_primary" />
-    </RadioGroup>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
         android:layout_marginTop="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -171,12 +145,13 @@
         android:layout_width="36dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
-        android:layout_marginTop="116dp"
+        android:layout_marginTop="172dp"
         android:layout_marginEnd="2dp"
         android:layout_marginBottom="12dp"
         android:contentDescription="@string/alphabet_index_bar"
         android:elevation="6dp"
-        android:paddingVertical="4dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         android:visibility="gone" />
 
     <TextView

@@ -3,19 +3,18 @@ package com.car.mp3player.ui
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Outline
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewOutlineProvider
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import com.car.mp3player.R
+import com.car.mp3player.model.VinylScale
 import kotlin.math.min
-import kotlin.math.sqrt
+import kotlin.math.roundToInt
 
 class VinylRecordView @JvmOverloads constructor(
     context: Context,
@@ -28,6 +27,9 @@ class VinylRecordView @JvmOverloads constructor(
     private val coverView: ImageView
     private var rotationAnimator: ObjectAnimator? = null
     private var discPx = 0
+    private var baseGeometry = VinylGeometry(0, 0)
+    var userScale: Float = VinylScale.DEFAULT
+        private set
 
     init {
         clipChildren = false
@@ -36,23 +38,35 @@ class VinylRecordView @JvmOverloads constructor(
         rotateGroup = findViewById(R.id.vinylRotateGroup)
         discView = findViewById(R.id.vinylDisc)
         coverView = findViewById(R.id.vinylCover)
-        coverView.outlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(view: View, outline: Outline) {
-                outline.setOval(0, 0, view.width, view.height)
-            }
-        }
-        coverView.clipToOutline = true
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         if (w <= 0 || h <= 0) return
-        val available = min(w, h).toFloat()
-        // Rotating a square disc needs ~sqrt(2) headroom; keep a small margin too.
-        val discPx = (available / sqrt(2f) * 0.96f).toInt().coerceIn(dp(160), dp(520))
-        this.discPx = discPx
-        val coverPx = (discPx * 0.50f).toInt()
-        layoutDiscAndCover(discPx, coverPx)
+        val geometry = calculateVinylGeometry(
+            widthPx = w,
+            heightPx = h,
+            horizontalPaddingPx = paddingLeft + paddingRight,
+            verticalPaddingPx = paddingTop + paddingBottom,
+            minimumDiscPx = dp(160)
+        )
+        baseGeometry = geometry
+        applyUserScale()
+    }
+
+    fun setUserScale(scale: Float): Float {
+        val normalized = VinylScale.clamp(scale)
+        if (normalized == userScale) return normalized
+        userScale = normalized
+        applyUserScale()
+        return normalized
+    }
+
+    private fun applyUserScale() {
+        val geometry = scaleVinylGeometry(baseGeometry, userScale)
+        if (geometry.discPx <= 0) return
+        discPx = geometry.discPx
+        layoutDiscAndCover(geometry.discPx, geometry.coverPx)
     }
 
     private fun layoutDiscAndCover(discPx: Int, coverPx: Int) {
@@ -125,4 +139,50 @@ class VinylRecordView @JvmOverloads constructor(
         rotationAnimator = null
         super.onDetachedFromWindow()
     }
+}
+
+internal data class VinylGeometry(
+    val discPx: Int,
+    val coverPx: Int
+)
+
+internal fun calculateVinylGeometry(
+    widthPx: Int,
+    heightPx: Int,
+    horizontalPaddingPx: Int,
+    verticalPaddingPx: Int,
+    minimumDiscPx: Int
+): VinylGeometry {
+    val rawShortSide = min(widthPx.coerceAtLeast(0), heightPx.coerceAtLeast(0))
+    if (rawShortSide <= 0) return VinylGeometry(0, 0)
+
+    // dp-based padding becomes disproportionately large on high-density phones
+    // such as Mate 60 Pro. Keep the requested padding, but cap the combined
+    // inset on each axis to 4% of the actual stage short side.
+    val maximumAxisPadding = (rawShortSide * 0.04f).roundToInt()
+    val effectiveHorizontalPadding = horizontalPaddingPx.coerceIn(0, maximumAxisPadding)
+    val effectiveVerticalPadding = verticalPaddingPx.coerceIn(0, maximumAxisPadding)
+    val availableWidth = (widthPx - effectiveHorizontalPadding).coerceAtLeast(0)
+    val availableHeight = (heightPx - effectiveVerticalPadding).coerceAtLeast(0)
+    // The player header ends exactly where this stage begins. Keeping the disc
+    // within both axes guarantees that it cannot cover the song or artist text.
+    val maximumDiscPx = min(availableWidth, availableHeight)
+    if (maximumDiscPx <= 0) return VinylGeometry(0, 0)
+
+    val preferredDiscPx = (maximumDiscPx * 0.98f).roundToInt()
+    val effectiveMinimum = minimumDiscPx.coerceAtLeast(0).coerceAtMost(maximumDiscPx)
+    val discPx = preferredDiscPx.coerceIn(effectiveMinimum, maximumDiscPx)
+    return VinylGeometry(
+        discPx = discPx,
+        coverPx = (discPx * 0.68f).roundToInt()
+    )
+}
+
+internal fun scaleVinylGeometry(base: VinylGeometry, scale: Float): VinylGeometry {
+    if (base.discPx <= 0 || base.coverPx <= 0) return VinylGeometry(0, 0)
+    val normalized = VinylScale.clamp(scale)
+    return VinylGeometry(
+        discPx = (base.discPx * normalized).roundToInt().coerceAtLeast(1),
+        coverPx = (base.coverPx * normalized).roundToInt().coerceAtLeast(1)
+    )
 }

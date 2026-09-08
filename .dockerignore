@@ -3,6 +3,7 @@
 .gradle
 .idea
 .tools
+.signing
 app/build
 build
 release

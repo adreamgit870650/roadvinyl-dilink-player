@@ -10,7 +10,9 @@ import com.car.mp3player.model.LyricFontFamily
 import com.car.mp3player.model.LyricHighlightMode
 import com.car.mp3player.model.LyricThemePreset
 import com.car.mp3player.model.PlaybackMode
+import com.car.mp3player.model.PlaylistTextScale
 import com.car.mp3player.model.ThemeMode
+import com.car.mp3player.model.VinylScale
 import com.car.mp3player.util.MediaPath
 
 class SettingsRepository(context: Context) {
@@ -36,6 +38,16 @@ class SettingsRepository(context: Context) {
     var nextLineScale: Float
         get() = prefs.getFloat(KEY_NEXT_SCALE, 0.92f)
         set(value) = prefs.edit { putFloat(KEY_NEXT_SCALE, value) }
+
+    var vinylScale: Float
+        get() = VinylScale.clamp(prefs.getFloat(KEY_VINYL_SCALE, VinylScale.DEFAULT))
+        set(value) = prefs.edit { putFloat(KEY_VINYL_SCALE, VinylScale.clamp(value)) }
+
+    var playlistTextSizeSp: Float
+        get() = PlaylistTextScale.clamp(
+            prefs.getFloat(KEY_PLAYLIST_TEXT_SIZE, PlaylistTextScale.DEFAULT)
+        )
+        set(value) = prefs.edit { putFloat(KEY_PLAYLIST_TEXT_SIZE, PlaylistTextScale.clamp(value)) }
 
     var maxLyricVisualLines: Int
         get() = prefs.getInt(KEY_MAX_VISUAL_LINES, 2).coerceIn(1, 4)
@@ -362,6 +374,8 @@ class SettingsRepository(context: Context) {
         const val KEY_PLAYER_NEXT_FONT_SIZE = "player_next_font_size"
         const val KEY_CURRENT_SCALE = "current_line_scale"
         const val KEY_NEXT_SCALE = "next_line_scale"
+        const val KEY_VINYL_SCALE = "vinyl_scale"
+        const val KEY_PLAYLIST_TEXT_SIZE = "playlist_text_size"
         const val KEY_MAX_VISUAL_LINES = "max_visual_lines"
         const val KEY_SMOOTH_LYRICS = "smooth_lyrics"
         const val KEY_LYRIC_HIGHLIGHT_MODE = "lyric_highlight_mode"

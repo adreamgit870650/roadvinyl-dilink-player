@@ -19,11 +19,13 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.MediaStyleNotificationHelper
 import com.car.mp3player.data.OnlineMusicApi
+import com.car.mp3player.compat.LegacyMediaCodecSelector
 import com.car.mp3player.data.PlaylistCache
 import com.car.mp3player.data.RssFeedRepository
 import com.car.mp3player.data.SettingsRepository
@@ -47,7 +49,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MusicPlaybackService : MediaSessionService() {
     private var exoPlayer: ExoPlayer? = null
     private var sessionPlayer: CarPlaylistPlayer? = null
@@ -126,12 +127,19 @@ class MusicPlaybackService : MediaSessionService() {
         }
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         runCatching {
             createChannel()
             PlaybackStateHolder.setPlayMode(settings.playMode)
-            exoPlayer = ExoPlayer.Builder(this).build().apply {
+            val renderersFactory = DefaultRenderersFactory(this).apply {
+                setEnableDecoderFallback(true)
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT) {
+                    setMediaCodecSelector(LegacyMediaCodecSelector)
+                }
+            }
+            exoPlayer = ExoPlayer.Builder(this, renderersFactory).build().apply {
                 addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_ENDED) playNext()
@@ -173,6 +181,14 @@ class MusicPlaybackService : MediaSessionService() {
     private fun handleStartCommand(intent: Intent?): Int {
         val action = intent?.action
         if (action == ACTION_STOP) {
+            stopSelfSafely()
+            return START_NOT_STICKY
+        }
+
+        if (action == ACTION_SET_MODE && playlist.isEmpty() && PlaybackStateHolder.songs.isEmpty()) {
+            val requested = intent?.getIntExtra(EXTRA_MODE, PlaybackMode.ORDER.ordinal)
+                ?: PlaybackMode.ORDER.ordinal
+            setPlayMode(PlaybackMode.entries.getOrElse(requested) { PlaybackMode.ORDER })
             stopSelfSafely()
             return START_NOT_STICKY
         }
@@ -245,7 +261,9 @@ class MusicPlaybackService : MediaSessionService() {
             }
             ACTION_SET_MODE -> {
                 val cmd = intent ?: return START_NOT_STICKY
-                val mode = PlaybackMode.entries[cmd.getIntExtra(EXTRA_MODE, 0)]
+                val mode = PlaybackMode.entries.getOrElse(cmd.getIntExtra(EXTRA_MODE, 0)) {
+                    PlaybackMode.ORDER
+                }
                 setPlayMode(mode)
             }
             ACTION_RESUME -> resumeLast()
@@ -821,6 +839,7 @@ class MusicPlaybackService : MediaSessionService() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun buildNotification(song: Song?, subtitle: String? = null): Notification {
         val title = song?.title ?: getString(R.string.app_name)
         val line = subtitle?.takeIf { it.isNotBlank() }
@@ -846,7 +865,8 @@ class MusicPlaybackService : MediaSessionService() {
     private fun updateNotification(song: Song?, subtitle: String? = null) {
         if (!foregroundStarted) return
         runCatching {
-            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(song, subtitle))
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIFICATION_ID, buildNotification(song, subtitle))
         }
     }
 

@@ -11,7 +11,12 @@ object AlbumColorExtractor {
         var g = 0L
         var b = 0L
         val pixels = IntArray(24 * 24)
-        sample.getPixels(pixels, 0, 24, 0, 0, 24, 24)
+        try {
+            sample.getPixels(pixels, 0, 24, 0, 0, 24, 24)
+        } finally {
+            // createScaledBitmap may return its input when it is already 24x24.
+            if (sample !== bitmap) sample.recycle()
+        }
         pixels.forEach { color ->
             r += Color.red(color)
             g += Color.green(color)

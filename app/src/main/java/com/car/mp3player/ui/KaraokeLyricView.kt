@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.Choreographer
@@ -24,6 +25,7 @@ class KaraokeLyricView @JvmOverloads constructor(
     private val nextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val pendingPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val dragHandlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val dragHandleRect = RectF()
 
     private var lyricState: LyricState? = null
     private var displayPositionMs = 0f
@@ -127,14 +129,12 @@ class KaraokeLyricView @JvmOverloads constructor(
             Color.green(color),
             Color.blue(color)
         )
-        canvas.drawRoundRect(
+        dragHandleRect.set(
             centerX - handleWidth / 2f,
             bottom - handleHeight,
             centerX + handleWidth / 2f,
-            bottom,
-            handleHeight / 2f,
-            handleHeight / 2f,
-            dragHandlePaint
+            bottom
         )
+        canvas.drawRoundRect(dragHandleRect, handleHeight / 2f, handleHeight / 2f, dragHandlePaint)
     }
 }

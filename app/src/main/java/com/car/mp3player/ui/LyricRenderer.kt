@@ -72,7 +72,11 @@ object LyricRenderer {
         val overlayNextTop = adjustForGradient(next, lift = 0.24f)
         val overlayNextBottom = adjustForGradient(next, lift = -0.06f)
         val overlayNextStroke = overlayNeutralStrokeColor(overlayBaseColor, lighter = true)
-        val strokeWidthPx = if (forPlayer) 0f else overlayStrokeWidthPx(settings.overlayStrokeWidth)
+        val strokeWidthPx = if (forPlayer) {
+            0f
+        } else {
+            overlayStrokeWidthPx(settings.overlayStrokeWidth, context.resources.displayMetrics.density)
+        }
         return Style(
             highlightColor = highlight,
             pendingColor = pending,
@@ -90,7 +94,10 @@ object LyricRenderer {
             nextSizePx = baseNext * density * if (forPlayer) settings.nextLineScale else 1f,
             otherSizePx = baseOther * density,
             typeface = LyricFontProvider.getTypeface(context, family, bold),
-            maxVisualLines = settings.maxLyricVisualLines,
+            // The user-facing line budget belongs to the floating overlay.
+            // Player lyrics own a clipped scrolling stage and must retain enough
+            // rows for bilingual and wrapped content regardless of that setting.
+            maxVisualLines = if (forPlayer) MAX_ROWS_PER_LYRIC_BLOCK else settings.maxLyricVisualLines,
             currentScale = settings.currentLineScale,
             nextScale = settings.nextLineScale,
             bold = bold,
@@ -222,14 +229,14 @@ object LyricRenderer {
         val rows = layoutKaraokeRows(
             line,
             pendingPaint,
-            maxWidth - padding(style),
+            maxWidth - padding(),
             maxRows.coerceAtLeast(1)
         )
         if (rows.isEmpty()) return 0f
 
         val totalHeight = rows.size * style.currentSizePx * 1.35f
         var topY = centerY - totalHeight / 2f + style.currentSizePx
-        val padX = padding(style) / 2f
+        val padX = padding() / 2f
         for (row in rows) {
             drawKaraokeRow(
                 canvas = canvas,
@@ -395,13 +402,13 @@ object LyricRenderer {
         val lines = wrapText(
             text,
             paint,
-            maxWidth - padding(style),
+            maxWidth - padding(),
             max(maxLines, minimumLyricRows(text))
         )
         val lineHeight = sizePx * 1.3f
         val totalH = lines.size * lineHeight
         var y = centerY - totalH / 2f + sizePx
-        val pad = padding(style) / 2f
+        val pad = padding() / 2f
         for (line in lines) {
             val w = paint.measureText(line)
             val lineX = max(pad, (maxWidth - w) / 2f)
@@ -457,7 +464,7 @@ object LyricRenderer {
             layoutKaraokeRows(
                 line,
                 pendingPaint,
-                maxW - padding(style),
+                maxW - padding(),
                 MAX_ROWS_PER_LYRIC_BLOCK
             ).size.coerceAtLeast(1)
         } ?: 1
@@ -465,7 +472,7 @@ object LyricRenderer {
             wrapText(
                 line.text,
                 nextPaint,
-                maxW - padding(style),
+                maxW - padding(),
                 MAX_ROWS_PER_LYRIC_BLOCK
             ).size
         } ?: 0
@@ -541,7 +548,7 @@ object LyricRenderer {
             layoutKaraokeRows(
                 it,
                 paint,
-                width.toFloat() - padding(style),
+                width.toFloat() - padding(),
                 MAX_ROWS_PER_LYRIC_BLOCK
             ).size.coerceAtLeast(1)
         } ?: 1
@@ -550,7 +557,7 @@ object LyricRenderer {
             wrapText(
                 it.text,
                 paint,
-                width.toFloat() - padding(style),
+                width.toFloat() - padding(),
                 MAX_ROWS_PER_LYRIC_BLOCK
             ).size
         } ?: 0
@@ -561,7 +568,7 @@ object LyricRenderer {
         return currentHeight + nextHeight + gap
     }
 
-    private fun padding(style: Style) = 24f
+    private fun padding() = 24f
 
     private const val MAX_ROWS_PER_LYRIC_BLOCK = 4
 
@@ -571,7 +578,7 @@ object LyricRenderer {
             return
         }
         val fillColor = paint.color
-        val strokeWidth = strokeWidthFor(paint.textSize, style.strokeWidthPx)
+        val strokeWidth = strokeWidthFor(style.strokeWidthPx)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = strokeWidth
         paint.strokeJoin = Paint.Join.ROUND
@@ -594,24 +601,35 @@ object LyricRenderer {
         strokeColor: Int
     ) {
         val fillColor = paint.color
-        val prevShader = paint.shader
+        val previousShader = paint.shader
+        val previousStyle = paint.style
+        val previousStrokeWidth = paint.strokeWidth
+        val previousStrokeJoin = paint.strokeJoin
         val textTop = baselineY - paint.textSize
         val textBottom = baselineY + paint.textSize * 0.1f
-        paint.shader = LinearGradient(
+        val fillShader = LinearGradient(
             x, textTop, x, textBottom,
             topColor, bottomColor, Shader.TileMode.CLAMP
         )
         if (style.outline) {
-            val strokeWidth = strokeWidthFor(paint.textSize, style.strokeWidthPx)
+            // A shader overrides Paint.color. Draw the solid outline with no
+            // shader first, then restore the gradient for the fill pass.
+            paint.shader = null
+            val strokeWidth = strokeWidthFor(style.strokeWidthPx)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = strokeWidth
             paint.strokeJoin = Paint.Join.ROUND
             paint.color = strokeColor
             canvas.drawText(text, x, baselineY, paint)
-            paint.style = Paint.Style.FILL
         }
+        paint.shader = fillShader
+        paint.style = Paint.Style.FILL
+        paint.color = fillColor
         canvas.drawText(text, x, baselineY, paint)
-        paint.shader = prevShader
+        paint.shader = previousShader
+        paint.style = previousStyle
+        paint.strokeWidth = previousStrokeWidth
+        paint.strokeJoin = previousStrokeJoin
         paint.color = fillColor
     }
 
@@ -640,14 +658,14 @@ object LyricRenderer {
         return Color.HSVToColor(245, hsv)
     }
 
-    /** 1=最细 … 10=最粗，默认 3 约等于字号的 3% */
-    private fun overlayStrokeWidthPx(level: Int): Float {
-        val ratio = 0.012f + (level - 1) * 0.007f
-        return ratio
+    /** 1=0.5dp … 10=2.75dp；默认档 3=1dp，各档在小字号下也保持可见差异。 */
+    internal fun overlayStrokeWidthPx(level: Int, density: Float): Float {
+        val normalizedLevel = level.coerceIn(1, 10)
+        val widthDp = 0.5f + (normalizedLevel - 1) * 0.25f
+        return widthDp * density.coerceAtLeast(0.1f)
     }
 
-    private fun strokeWidthFor(textSizePx: Float, ratio: Float): Float {
-        if (ratio <= 0f) return (textSizePx * 0.03f).coerceIn(1f, 4f)
-        return (textSizePx * ratio).coerceIn(1f, 5f)
+    private fun strokeWidthFor(configuredPx: Float): Float {
+        return configuredPx.coerceAtLeast(0.5f)
     }
 }

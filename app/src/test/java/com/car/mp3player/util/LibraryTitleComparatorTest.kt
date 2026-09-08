@@ -93,4 +93,24 @@ class LibraryTitleComparatorTest {
         assertNull(comparator.sectionOf("9号歌曲"))
         assertNull(comparator.sectionOf("#收藏"))
     }
+
+    @Test
+    fun `sorts accented Latin and pinyin together before other scripts`() {
+        assertEquals(
+            listOf("爱的歌", "Élan", "Örebro", "Život", "가나다", "さくら"),
+            listOf("さくら", "Život", "가나다", "Élan", "爱的歌", "Örebro")
+                .sortedWith(comparator)
+        )
+        assertEquals('Z', comparator.sectionOf("Život"))
+        assertNull(comparator.sectionOf("가나다"))
+        assertNull(comparator.sectionOf("さくら"))
+    }
+
+    @Test
+    fun `keeps supplementary Han characters intact when no pinyin is available`() {
+        val rareHan = String(Character.toChars(0x20000))
+        assertEquals(listOf("Zulu", rareHan, "가나다"),
+            listOf("가나다", rareHan, "Zulu").sortedWith(comparator))
+        assertNull(comparator.sectionOf(rareHan))
+    }
 }

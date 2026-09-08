@@ -176,6 +176,36 @@
                     android:layout_marginTop="8dp"
                     android:text="@string/online_cover"
                     android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/vinyl_scale"
+                    android:textColor="@color/text_primary" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/vinylScaleSlider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:stepSize="0.05"
+                    android:valueFrom="0.60"
+                    android:valueTo="2.00" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/playlist_text_size"
+                    android:textColor="@color/text_primary" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/playlistTextSizeSlider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:stepSize="1"
+                    android:valueFrom="12"
+                    android:valueTo="24" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -284,7 +314,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:contentDescription="@string/overlay_lyric_color"
-                    android:paddingHorizontal="8dp" />
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp" />
 
                 <TextView
                     android:layout_width="match_parent"
@@ -298,7 +329,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:contentDescription="@string/overlay_highlight_lyric_color"
-                    android:paddingHorizontal="8dp" />
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp" />
 
                 <TextView
                     android:layout_width="match_parent"

@@ -7,17 +7,21 @@ low-glare vinyl-inspired player with local library scanning, word-timed karaoke 
 desktop/instrument-cluster lyric overlays, steering-wheel media controls, boot resume, online
 music discovery, radio, podcasts, and integrity-checked in-app updates.
 
-Current version: **4.1.0**
+Current version: **4.7.0**
 
 ## Highlights
 
 - Scan local audio from shared storage, SD cards, and user-selected folders.
-- Cache the library for fast startup; search and sort by title, artist, or duration.
+- Cache the library for fast startup; search the library and browse songs by artist.
+- Reuse indexed metadata for unchanged audio files to speed up rescans of large libraries.
+- Select internal storage, SD-card, or USB folders through modern and legacy directory pickers.
 - Parse adjacent LRC files and embedded ID3 USLT/SYLT lyrics.
 - Fetch and save lyrics from multiple providers when no local lyrics are available.
 - Show synchronized lyrics in the player, a movable overlay, or a secondary display.
 - Handle previous, next, and play/pause commands through Media3 `MediaSessionService`.
 - Resume the last queue after boot and recover the media-button route during long sessions.
+- Deduplicate resume requests and support legacy media decoding and overlay behavior down to Android 4.4.
+- Adjust vinyl size and playlist text size; decode covers near their display resolution to reduce memory use.
 - Browse configurable online music, Radio Browser stations, and RSS podcasts.
 - Check, download, SHA-256 verify, and hand off APK updates to Android's installer.
 
@@ -31,6 +35,9 @@ gradle testDebugUnitTest lintDebug assembleRelease --no-daemon
 
 The unsigned release APK is written to
 `app/build/outputs/apk/release/app-release-unsigned.apk`.
+
+The same source supports Android 7.0 (API 24), Android 5.1 (API 22), and a dedicated
+legacy-car Android 4.4 (API 19) build. See [`docs/RELEASE-BUILD.md`](docs/RELEASE-BUILD.md).
 
 ## Optional update endpoint
 
@@ -55,3 +62,7 @@ have their own terms and availability. See [SECURITY.md](SECURITY.md),
 
 BYD and DiLink are trademarks of their respective owner. This project is not affiliated with or
 endorsed by BYD.
+
+## Author and customization
+
+For feature customization, in-car system adaptation, or collaboration: `95588577@qq.com`

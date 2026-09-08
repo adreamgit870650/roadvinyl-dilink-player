@@ -46,6 +46,11 @@ class PlaylistFragment : Fragment() {
         }
     }
 
+    fun refreshPlaylistTextSize() {
+        childFragmentManager.fragments.filterIsInstance<LocalPlaylistFragment>()
+            .forEach(LocalPlaylistFragment::refreshPlaylistTextSize)
+    }
+
     override fun onDestroyView() {
         tabMediator?.detach()
         tabMediator = null

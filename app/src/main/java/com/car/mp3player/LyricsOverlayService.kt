@@ -7,12 +7,14 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
-import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.widget.Toast
 import com.car.mp3player.data.SettingsRepository
+import com.car.mp3player.compat.OverlayCompat
 import com.car.mp3player.model.LyricState
 import com.car.mp3player.ui.KaraokeLyricView
 import com.car.mp3player.ui.LyricRenderer
@@ -42,7 +44,7 @@ class LyricsOverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!Settings.canDrawOverlays(this)) {
+        if (!OverlayCompat.canDrawOverlays(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -67,7 +69,7 @@ class LyricsOverlayService : Service() {
     private fun showOverlayIfNeeded() {
         if (overlayView != null) return
         if (AppForegroundTracker.isInForeground) return
-        if (!settings.overlayEnabled || !Settings.canDrawOverlays(this)) return
+        if (!settings.overlayEnabled || !OverlayCompat.canDrawOverlays(this)) return
 
         val view = KaraokeLyricView(this)
         val (screenWidth, screenHeight) = screenSize()
@@ -76,7 +78,7 @@ class LyricsOverlayService : Service() {
         val params = WindowManager.LayoutParams(
             widthPx,
             heightPx,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            OverlayCompat.windowType(),
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -96,13 +98,27 @@ class LyricsOverlayService : Service() {
         view.setOnTouchListener { _, event -> handleOverlayTouch(view, event) }
         overlayView = view
         overlayParams = params
-        windowManager?.addView(view, params)
+        runCatching { windowManager?.addView(view, params) }.onFailure {
+            // Some legacy vendor ROMs additionally gate overlays via AppOps.
+            // A denied overlay must not terminate music playback.
+            overlayView = null
+            overlayParams = null
+            Log.w("LyricsOverlayService", "Unable to show lyric overlay", it)
+            settings.overlayEnabled = false
+            Toast.makeText(this, R.string.overlay_window_failed, Toast.LENGTH_LONG).show()
+            stopSelf()
+            return
+        }
         updateDragHandleVisibility()
         lastLyricState?.let { view.update(it) }
     }
 
     private fun removeOverlay() {
-        overlayView?.let { windowManager?.removeView(it) }
+        overlayView?.let { view ->
+            runCatching { windowManager?.removeView(view) }.onFailure {
+                Log.w("LyricsOverlayService", "Overlay was already removed by the system", it)
+            }
+        }
         overlayView = null
         overlayParams = null
         lastLayoutTextKey = ""
@@ -339,7 +355,7 @@ class LyricsOverlayService : Service() {
     private fun onForegroundChanged(inForeground: Boolean) {
         if (inForeground) {
             removeOverlay()
-        } else if (settings.overlayEnabled && Settings.canDrawOverlays(this)) {
+        } else if (settings.overlayEnabled && OverlayCompat.canDrawOverlays(this)) {
             showOverlayIfNeeded()
             lastLyricState?.let { overlayView?.update(it) }
         }
@@ -350,7 +366,7 @@ class LyricsOverlayService : Service() {
         private var instance: LyricsOverlayService? = null
 
         fun start(context: Context) {
-            if (!Settings.canDrawOverlays(context)) return
+            if (!OverlayCompat.canDrawOverlays(context)) return
             context.startService(Intent(context, LyricsOverlayService::class.java))
         }
 

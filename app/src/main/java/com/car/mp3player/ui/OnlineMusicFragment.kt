@@ -160,7 +160,7 @@ class OnlineMusicFragment : Fragment(), PlaybackStateHolder.Listener {
         clearActivePlaylist()
         binding.discoverScroll.visibility = View.GONE
         binding.playlistDetailContainer.visibility = View.VISIBLE
-        binding.toolbar.navigationIcon = requireContext().getDrawable(android.R.drawable.ic_menu_revert)
+        binding.toolbar.navigationIcon = ContextCompat.getDrawable(requireContext(), android.R.drawable.ic_menu_revert)
         binding.toolbar.subtitle = getString(R.string.online_mine)
         val playlistHeaders = library.userPlaylists().map { playlist ->
             Song(
@@ -212,7 +212,7 @@ class OnlineMusicFragment : Fragment(), PlaybackStateHolder.Listener {
 
         binding.discoverScroll.visibility = View.GONE
         binding.playlistDetailContainer.visibility = View.VISIBLE
-        binding.toolbar.navigationIcon = requireContext().getDrawable(android.R.drawable.ic_menu_revert)
+        binding.toolbar.navigationIcon = ContextCompat.getDrawable(requireContext(), android.R.drawable.ic_menu_revert)
         binding.toolbar.subtitle = title
         currentSongs = songs
         renderSongList(songs, getString(R.string.online_empty))
@@ -312,7 +312,7 @@ class OnlineMusicFragment : Fragment(), PlaybackStateHolder.Listener {
             clearActivePlaylist()
             binding.discoverScroll.visibility = View.GONE
             binding.playlistDetailContainer.visibility = View.VISIBLE
-            binding.toolbar.navigationIcon = requireContext().getDrawable(android.R.drawable.ic_menu_revert)
+            binding.toolbar.navigationIcon = ContextCompat.getDrawable(requireContext(), android.R.drawable.ic_menu_revert)
             binding.toolbar.subtitle = getString(R.string.online_search_result, keyword)
             val playlistRows = playlists.take(8).map { summary ->
                 Song(

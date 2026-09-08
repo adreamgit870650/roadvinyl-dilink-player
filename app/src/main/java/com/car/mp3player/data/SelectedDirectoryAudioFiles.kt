@@ -6,27 +6,47 @@ import java.net.URLDecoder
 /** Enumerates audio files strictly beneath roots explicitly selected by the user. */
 object SelectedDirectoryAudioFiles {
     fun collect(roots: List<File>, audioExtensions: Set<String>): List<File> {
+        return collectWithStatus(roots, audioExtensions).files
+    }
+
+    fun collectWithStatus(roots: List<File>, audioExtensions: Set<String>): AudioFileCollection {
         val normalizedExtensions = audioExtensions.map { it.lowercase() }.toSet()
         val seenFiles = linkedSetOf<String>()
         val result = mutableListOf<File>()
+        var complete = true
 
         roots.distinctBy(::stablePath).forEach { root ->
-            if (!root.exists() || !root.isDirectory) return@forEach
+            val rootReady = runCatching { root.exists() && root.isDirectory && root.canRead() }
+                .getOrDefault(false)
+            if (!rootReady) {
+                complete = false
+                return@forEach
+            }
             root.walkTopDown()
-                .onFail { _, _ -> }
+                .onFail { _, _ -> complete = false }
                 .filter { file ->
-                    file.isFile && file.extension.lowercase() in normalizedExtensions
+                    runCatching {
+                        file.isFile && file.extension.lowercase() in normalizedExtensions
+                    }.getOrElse {
+                        complete = false
+                        false
+                    }
                 }
                 .forEach { file ->
                     if (seenFiles.add(stablePath(file))) result += file
                 }
         }
-        return result
+        return AudioFileCollection(result, complete)
     }
 
     private fun stablePath(file: File): String =
         runCatching { file.canonicalPath }.getOrDefault(file.absolutePath)
 }
+
+data class AudioFileCollection(
+    val files: List<File>,
+    val complete: Boolean
+)
 
 /** Maps raw paths and ExternalStorageProvider document URIs for the same file to one key. */
 object AudioFileIdentity {

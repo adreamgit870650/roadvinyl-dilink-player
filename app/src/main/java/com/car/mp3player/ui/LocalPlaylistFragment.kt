@@ -7,6 +7,7 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -17,7 +18,6 @@ import com.car.mp3player.data.SettingsRepository
 import com.car.mp3player.databinding.FragmentLocalPlaylistBinding
 import com.car.mp3player.model.ArtistGroup
 import com.car.mp3player.model.LibraryKind
-import com.car.mp3player.model.PlaylistSortOrder
 import com.car.mp3player.model.PlaylistViewMode
 import com.car.mp3player.model.Song
 import com.car.mp3player.playback.PlaybackStateHolder
@@ -29,11 +29,12 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
     private val binding get() = _binding!!
     private lateinit var songAdapter: SongAdapter
     private lateinit var artistAdapter: ArtistAdapter
+    private lateinit var settings: SettingsRepository
     private var query = ""
     private var viewMode = PlaylistViewMode.ALL_SONGS
-    private var sortOrder = PlaylistSortOrder.TITLE
     private var selectedArtist: String? = null
     private var displayedSongs: List<Song> = emptyList()
+    private var lastAutoLocatedPath: String? = null
     private var lastClickMs = 0L
     private val hideIndexPopup = Runnable {
         _binding?.indexLetterOverlay?.visibility = View.GONE
@@ -50,7 +51,7 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val settings = SettingsRepository(requireContext())
+        settings = SettingsRepository(requireContext())
         val palette = AppThemeManager.palette(requireContext(), settings)
         AppThemeManager.applyFragmentRoot(binding.root, palette)
         binding.alphabetIndexBar.setColors(palette.primary, palette.textSecondary)
@@ -70,13 +71,17 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
                 val visibleSongs = currentVisibleSongs()
                 val playIndex = visibleSongs.indexOfFirst { it.path == song.path }.takeIf { it >= 0 } ?: indexInList
                 (activity as? MainHost)?.playSongSubset(visibleSongs, playIndex, LibraryKind.MUSIC)
-            }
+            },
+            initialTextSizeSp = settings.playlistTextSizeSp
         )
-        artistAdapter = ArtistAdapter { group ->
-            selectedArtist = group.name
-            updateToolbar()
-            applyFilter()
-        }
+        artistAdapter = ArtistAdapter(
+            onClick = { group ->
+                selectedArtist = group.name
+                updateToolbar()
+                applyFilter()
+            },
+            initialTextSizeSp = settings.playlistTextSizeSp
+        )
 
         binding.songList.layoutManager = LinearLayoutManager(requireContext())
         binding.songList.adapter = songAdapter
@@ -96,14 +101,6 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
         binding.alphabetIndexBar.onSelectionFinished = {
             binding.indexLetterOverlay.removeCallbacks(hideIndexPopup)
             binding.indexLetterOverlay.postDelayed(hideIndexPopup, 250L)
-        }
-        binding.sortGroup.setOnCheckedChangeListener { _, checkedId ->
-            sortOrder = when (checkedId) {
-                R.id.sortDurationAsc -> PlaylistSortOrder.DURATION_ASC
-                R.id.sortDurationDesc -> PlaylistSortOrder.DURATION_DESC
-                else -> PlaylistSortOrder.TITLE
-            }
-            applyFilter()
         }
         binding.toolbar.setNavigationOnClickListener { exitArtistDetail() }
         refreshFromHost()
@@ -130,6 +127,12 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
         PlaybackStateHolder.addListener(this)
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshPlaylistTextSize()
+        PlaybackStateHolder.currentSong?.path?.let { locatePlayingSong(it, force = true) }
+    }
+
     override fun onStop() {
         PlaybackStateHolder.removeListener(this)
         super.onStop()
@@ -141,7 +144,14 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
         positionMs: Long,
         lines: List<com.car.mp3player.model.LrcLine>
     ) {
+        val previousPath = songAdapter.playingPath
         songAdapter.playingPath = song?.path
+        val path = song?.path
+        if (path == null) {
+            lastAutoLocatedPath = null
+        } else if (path != previousPath) {
+            locatePlayingSong(path)
+        }
     }
 
     override fun onPlaylistChanged(songs: List<Song>) {
@@ -173,7 +183,9 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
         val list = currentVisibleSongs()
         displayedSongs = list
         songAdapter.playingPath = PlaybackStateHolder.currentSong?.path
-        songAdapter.submitSongs(list)
+        songAdapter.submitSongs(list) {
+            PlaybackStateHolder.currentSong?.path?.let { locatePlayingSong(it, force = true) }
+        }
         updateAlphabetIndex(list)
         binding.songCountText.text = getString(R.string.song_count, list.size)
         binding.emptyText.text = getString(R.string.no_songs)
@@ -199,22 +211,18 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
         binding.songList.visibility = if (artists.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    private fun sortSongs(list: List<Song>): List<Song> = when (sortOrder) {
-        PlaylistSortOrder.TITLE -> list.sortedWith(songTitleComparator)
-        PlaylistSortOrder.DURATION_ASC -> list.sortedWith(
-            compareBy<Song> { if (it.durationMs <= 0L) Long.MAX_VALUE else it.durationMs }
-                .thenComparator(songTitleComparator::compare)
-        )
-        PlaylistSortOrder.DURATION_DESC -> list.sortedWith(
-            compareByDescending<Song> { if (it.durationMs <= 0L) Long.MIN_VALUE else it.durationMs }
-                .thenComparator(songTitleComparator::compare)
-        )
+    private fun sortSongs(list: List<Song>): List<Song> = list.sortedWith(songTitleComparator)
+
+    fun refreshPlaylistTextSize() {
+        if (_binding == null || !::settings.isInitialized) return
+        if (::songAdapter.isInitialized) songAdapter.setPlaylistTextSize(settings.playlistTextSizeSp)
+        if (::artistAdapter.isInitialized) artistAdapter.setPlaylistTextSize(settings.playlistTextSizeSp)
     }
 
     private fun updateToolbar() {
         val inArtistDetail = viewMode == PlaylistViewMode.BY_ARTIST && selectedArtist != null
         binding.toolbar.navigationIcon = if (inArtistDetail) {
-            requireContext().getDrawable(android.R.drawable.ic_menu_revert)
+            ContextCompat.getDrawable(requireContext(), android.R.drawable.ic_menu_revert)
         } else null
         binding.toolbar.subtitle = when {
             selectedArtist != null -> selectedArtist
@@ -239,7 +247,7 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
     private fun updateAlphabetIndex(songs: List<Song>) {
         val sections = songs.mapNotNull { titleComparator.sectionOf(it.title) }.toSet()
         binding.alphabetIndexBar.setAvailableSections(sections)
-        binding.alphabetIndexBar.isVisible = sortOrder == PlaylistSortOrder.TITLE && sections.isNotEmpty()
+        binding.alphabetIndexBar.isVisible = sections.isNotEmpty()
         if (!binding.alphabetIndexBar.isVisible) binding.indexLetterOverlay.visibility = View.GONE
     }
 
@@ -253,9 +261,30 @@ class LocalPlaylistFragment : Fragment(), PlaybackStateHolder.Listener {
         binding.indexLetterOverlay.visibility = View.VISIBLE
     }
 
+    private fun locatePlayingSong(path: String, force: Boolean = false) {
+        if (!force && path == lastAutoLocatedPath) return
+        if (binding.songList.adapter !== songAdapter) return
+        val index = displayedSongs.indexOfFirst { it.path == path }
+        if (index < 0) return
+        lastAutoLocatedPath = path
+        binding.songList.post {
+            val currentBinding = _binding ?: return@post
+            if (currentBinding.songList.adapter !== songAdapter) return@post
+            val currentIndex = displayedSongs.indexOfFirst { it.path == path }
+            if (currentIndex < 0) return@post
+            val offset = (currentBinding.songList.height * PLAYING_ITEM_VERTICAL_OFFSET_RATIO).toInt()
+            (currentBinding.songList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(currentIndex, offset)
+        }
+    }
+
     override fun onDestroyView() {
         binding.indexLetterOverlay.removeCallbacks(hideIndexPopup)
         _binding = null
         super.onDestroyView()
+    }
+
+    companion object {
+        private const val PLAYING_ITEM_VERTICAL_OFFSET_RATIO = 0.32f
     }
 }

@@ -144,7 +144,7 @@ app/src/main/res/drawable/ic_launcher_foreground.xml
 
 ### 4. 上传后确认版本号
 
-打开 GitHub 上 `app/build.gradle.kts`，确认 `versionName` 是你期望的版本（当前为 `4.1.0`），再 Run workflow。
+打开 GitHub 上 `app/build.gradle.kts`，确认 `versionName` 是你期望的版本（当前为 `4.7.0`），再 Run workflow。
 
 ---
 

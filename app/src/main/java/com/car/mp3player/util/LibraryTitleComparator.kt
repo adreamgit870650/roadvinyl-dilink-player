@@ -14,6 +14,7 @@ import net.sourceforge.pinyin4j.format.HanyuPinyinVCharType
  * their complete, tone-free pinyin/Latin spelling.
  */
 class LibraryTitleComparator : Comparator<String> {
+    private val sortKeyCache = HashMap<String, SortKey>()
     private val pinyinFormat = HanyuPinyinOutputFormat().apply {
         caseType = HanyuPinyinCaseType.LOWERCASE
         toneType = HanyuPinyinToneType.WITHOUT_TONE
@@ -41,14 +42,16 @@ class LibraryTitleComparator : Comparator<String> {
     }
 
     private fun sortKey(text: String): SortKey {
+        return sortKeyCache[text] ?: createSortKey(text).also { sortKeyCache[text] = it }
+    }
+
+    private fun createSortKey(text: String): SortKey {
         if (text.isEmpty()) return SortKey(GROUP_SYMBOL_OR_NUMBER, FILE_EXTENSION_MARKER)
 
         val codePoint = text.codePointAt(0)
-        val script = Character.UnicodeScript.of(codePoint)
-
         val group = when {
             !Character.isLetter(codePoint) -> GROUP_SYMBOL_OR_NUMBER
-            script == Character.UnicodeScript.LATIN || script == Character.UnicodeScript.HAN -> {
+            isLatin(codePoint) || isHan(codePoint) -> {
                 GROUP_ALPHABETIC
             }
             else -> GROUP_OTHER_LETTER
@@ -65,7 +68,7 @@ class LibraryTitleComparator : Comparator<String> {
                 val codePoint = normalized.codePointAt(offset)
                 when {
                     isCombiningMark(codePoint) -> Unit
-                    Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HAN &&
+                    isHan(codePoint) &&
                         Character.isBmpCodePoint(codePoint) -> {
                         val pinyin = PinyinHelper.toHanyuPinyinStringArray(
                             codePoint.toChar(),
@@ -79,6 +82,20 @@ class LibraryTitleComparator : Comparator<String> {
             }
         }.lowercase(Locale.ROOT)
     }
+
+    // UnicodeScript is only available on Android 7+. Use code-point ranges so
+    // the same filename sorting and index bar also work on Android 5.1.
+    private fun isLatin(codePoint: Int): Boolean =
+        codePoint in 0x0041..0x007A || codePoint in 0x00C0..0x02E4 ||
+            codePoint in 0x1D00..0x1DBF || codePoint in 0x1E00..0x1EFF ||
+            codePoint in 0x2C60..0x2C7F || codePoint in 0xA720..0xA7FF ||
+            codePoint in 0xAB30..0xAB6F || codePoint in 0xFB00..0xFB06 ||
+            codePoint in 0xFF21..0xFF3A || codePoint in 0xFF41..0xFF5A
+
+    private fun isHan(codePoint: Int): Boolean =
+        codePoint in 0x3400..0x4DBF || codePoint in 0x4E00..0x9FFF ||
+            codePoint in 0xF900..0xFAFF || codePoint in 0x20000..0x2EE5F ||
+            codePoint in 0x2F800..0x2FA1F || codePoint in 0x30000..0x323AF
 
     private fun isCombiningMark(codePoint: Int): Boolean = when (Character.getType(codePoint)) {
         Character.NON_SPACING_MARK.toInt(),

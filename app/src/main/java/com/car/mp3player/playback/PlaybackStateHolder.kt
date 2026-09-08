@@ -103,6 +103,20 @@ object PlaybackStateHolder {
         songs = updated
     }
 
+    fun updateSongMetadata(song: Song) {
+        val index = songs.indexOfFirst { it.path == song.path }
+        if (index < 0) return
+        val updated = songs.toMutableList()
+        updated[index] = updated[index].copy(
+            title = song.title,
+            artist = song.artist,
+            durationMs = song.durationMs
+        )
+        songs = updated
+        listeners.forEach { it.onPlaylistChanged(updated) }
+        if (index == currentIndex) notify(updated[index])
+    }
+
     fun setCoverArt(path: String?) {
         coverArtPath = path
         listeners.forEach { it.onCoverChanged(path) }

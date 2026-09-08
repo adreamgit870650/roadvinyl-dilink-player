@@ -3,6 +3,7 @@ package com.car.mp3player
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.car.mp3player.data.SettingsRepository
 import com.car.mp3player.playback.PlaybackStateHolder
@@ -37,6 +38,11 @@ class BootReceiver : BroadcastReceiver() {
     private fun startBootResume(context: Context) {
         val settings = SettingsRepository(context)
         if (!settings.bootAutoStart || !settings.autoResumePlayback) return
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val now = SystemClock.elapsedRealtime()
+        val last = prefs.getLong(KEY_LAST_BOOT_RESUME, 0L)
+        if (now - last in 0 until BOOT_DEBOUNCE_MS) return
+        prefs.edit().putLong(KEY_LAST_BOOT_RESUME, now).commit()
         ContextCompat.startForegroundService(
             context,
             Intent(context, BootResumeService::class.java)
@@ -49,6 +55,8 @@ class BootReceiver : BroadcastReceiver() {
         private const val ACTION_REBOOT = "android.intent.action.REBOOT"
         private const val PREFS = "boot_receiver"
         private const val KEY_LAST_UNLOCK_RESUME = "last_unlock_resume"
+        private const val KEY_LAST_BOOT_RESUME = "last_boot_resume"
         private const val UNLOCK_DEBOUNCE_MS = 60_000L
+        private const val BOOT_DEBOUNCE_MS = 30_000L
     }
 }

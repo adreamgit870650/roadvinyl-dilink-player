@@ -3,6 +3,7 @@ package com.car.mp3player.data
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -36,6 +37,22 @@ class SelectedDirectoryAudioFilesTest {
         val result = SelectedDirectoryAudioFiles.collect(listOf(root, child), setOf("mp3"))
 
         assertEquals(listOf(song.canonicalPath), result.map { it.canonicalPath })
+    }
+
+    @Test
+    fun `marks scan incomplete when a selected root is unavailable`() {
+        val available = temporaryFolder.newFolder("available")
+        val song = File(available, "song.mp3").apply { writeBytes(byteArrayOf(1)) }
+        val missing = File(temporaryFolder.root, "missing-usb")
+
+        val result = SelectedDirectoryAudioFiles.collectWithStatus(
+            listOf(available, missing),
+            setOf("mp3")
+        )
+
+        assertEquals(listOf(song.canonicalPath), result.files.map { it.canonicalPath })
+        assertFalse(result.complete)
+        assertTrue(result.files.isNotEmpty())
     }
 
     @Test

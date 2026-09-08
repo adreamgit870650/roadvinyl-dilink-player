@@ -3,6 +3,7 @@ package com.car.mp3player
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IBinder
@@ -15,7 +16,7 @@ import com.car.mp3player.playback.PlaybackStateHolder
 class ClusterLyricService : Service(), PlaybackStateHolder.Listener {
     private lateinit var settings: SettingsRepository
     private var presentation: ClusterLyricPresentation? = null
-    private var attachedDisplayId: Int = Display.INVALID_DISPLAY
+    private var attachedDisplayId: Int = INVALID_DISPLAY_ID
 
     override fun onCreate() {
         super.onCreate()
@@ -71,7 +72,7 @@ class ClusterLyricService : Service(), PlaybackStateHolder.Listener {
     }
 
     private fun findClusterDisplay(): Display? {
-        val manager = getSystemService(DisplayManager::class.java) ?: return null
+        val manager = getSystemService(DISPLAY_SERVICE) as? DisplayManager ?: return null
         val displays = manager.displays
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             displays.firstOrNull {
@@ -81,14 +82,14 @@ class ClusterLyricService : Service(), PlaybackStateHolder.Listener {
         }
         return displays
             .filter { it.displayId != Display.DEFAULT_DISPLAY }
-            .minByOrNull { it.mode?.physicalWidth ?: Int.MAX_VALUE }
+            .minByOrNull { display -> Point().also { display.getRealSize(it) }.x }
             ?: displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
     }
 
     private fun hidePresentation() {
         presentation?.dismiss()
         presentation = null
-        attachedDisplayId = Display.INVALID_DISPLAY
+        attachedDisplayId = INVALID_DISPLAY_ID
     }
 
     fun refreshPresentation() {
@@ -99,6 +100,8 @@ class ClusterLyricService : Service(), PlaybackStateHolder.Listener {
     }
 
     companion object {
+        // Display.INVALID_DISPLAY was only exposed in API 23.
+        private const val INVALID_DISPLAY_ID = -1
         private var instance: ClusterLyricService? = null
 
         fun start(context: Context) {

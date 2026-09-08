@@ -2,7 +2,9 @@ package com.car.mp3player.ui
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import com.car.mp3player.R
 import com.car.mp3player.data.SettingsRepository
 import kotlin.coroutines.resume
@@ -32,12 +34,17 @@ object StartupSoundPlayer {
                 onDone()
                 return
             }
-            player.setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                player.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                player.setAudioStreamType(AudioManager.STREAM_MUSIC)
+            }
             player.setVolume(1f, 1f)
             player.setOnCompletionListener {
                 player.release()

@@ -68,9 +68,10 @@ class AppUpdateManager(private val context: Context) {
             try {
                 check(connection.responseCode in 200..299) { "下载更新失败（${connection.responseCode}）" }
                 check(connection.url.protocol == "https") { "更新下载被重定向到不安全地址" }
+                val contentLength = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
                 val expected = when {
                     info.sizeBytes > 0 -> info.sizeBytes
-                    connection.contentLengthLong > 0 -> connection.contentLengthLong
+                    contentLength > 0 -> contentLength
                     else -> -1L
                 }
                 connection.inputStream.use { input ->
